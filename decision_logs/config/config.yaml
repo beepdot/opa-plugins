@@ -1,0 +1,5 @@
+decision_logs:
+  plugin: print_decision_logs_on_failure
+plugins:
+  println_decision_logger:
+    stdout: true
