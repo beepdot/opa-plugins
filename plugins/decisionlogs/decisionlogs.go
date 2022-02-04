@@ -7,16 +7,29 @@ import (
 	"os"
 	"sync"
 
-	//	"github.com/open-policy-agent/opa/cmd"
 	"github.com/open-policy-agent/opa/plugins"
 	"github.com/open-policy-agent/opa/plugins/logs"
 
-	//	"github.com/open-policy-agent/opa/runtime"
 	"github.com/open-policy-agent/opa/util"
 	"github.com/tidwall/gjson"
 )
 
 const PluginName = "print_decision_logs_on_failure"
+
+func New(m *plugins.Manager, config interface{}) plugins.Plugin {
+
+	m.UpdatePluginStatus(PluginName, &plugins.Status{State: plugins.StateNotReady})
+
+	return &PrintlnLogger{
+		manager: m,
+		config:  config.(Config),
+	}
+}
+
+func Validate(_ *plugins.Manager, config []byte) (interface{}, error) {
+	parsedConfig := Config{}
+	return parsedConfig, util.Unmarshal(config, &parsedConfig)
+}
 
 type Config struct {
 	Stdout bool `json:"stdout"` // true => stdout, false => stderr
@@ -69,29 +82,3 @@ func (p *PrintlnLogger) Log(ctx context.Context, event logs.EventV1) error {
 	}
 	return nil
 }
-
-type Factory struct{}
-
-func (Factory) New(m *plugins.Manager, config interface{}) plugins.Plugin {
-
-	m.UpdatePluginStatus(PluginName, &plugins.Status{State: plugins.StateNotReady})
-
-	return &PrintlnLogger{
-		manager: m,
-		config:  config.(Config),
-	}
-}
-
-func (Factory) Validate(_ *plugins.Manager, config []byte) (interface{}, error) {
-	parsedConfig := Config{}
-	return parsedConfig, util.Unmarshal(config, &parsedConfig)
-}
-
-// func main() {
-// 	runtime.RegisterPlugin(PluginName, Factory{})
-
-// 	if err := cmd.RootCommand.Execute(); err != nil {
-// 		fmt.Println(err)
-// 		os.Exit(1)
-// 	}
-// }
