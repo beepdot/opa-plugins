@@ -16,23 +16,29 @@ import (
 
 const PluginName = "print_decision_logs_on_failure"
 
-func New(m *plugins.Manager, config interface{}) plugins.Plugin {
+func Validate(_ *plugins.Manager, bs []byte) (*Config, error) {
+	cfg := Config{}
+
+	if err := util.Unmarshal(bs, &cfg); err != nil {
+		return nil, err
+	}
+
+	return &cfg, util.Unmarshal(bs, &cfg)
+}
+
+func New(m *plugins.Manager, cfg *Config) plugins.Plugin {
 
 	m.UpdatePluginStatus(PluginName, &plugins.Status{State: plugins.StateNotReady})
 
 	return &PrintlnLogger{
 		manager: m,
-		config:  config.(Config),
+		config:  *cfg,
 	}
 }
 
-func Validate(_ *plugins.Manager, config []byte) (interface{}, error) {
-	parsedConfig := Config{}
-	return parsedConfig, util.Unmarshal(config, &parsedConfig)
-}
-
 type Config struct {
-	Stdout bool `json:"stdout"` // true => stdout, false => stderr
+	// true => failed decision logs printed, false => failed decision logs are not printed
+	Stdout bool `json:"stdout"`
 }
 
 type PrintlnLogger struct {
@@ -56,8 +62,6 @@ func (p *PrintlnLogger) Reconfigure(ctx context.Context, config interface{}) {
 	p.config = config.(Config)
 }
 
-// Log is called by the decision logger when a record (event) should be emitted. The logs.EventV1 fields
-// map 1:1 to those described in https://www.openpolicyagent.org/docs/latest/management-decision-logs
 func (p *PrintlnLogger) Log(ctx context.Context, event logs.EventV1) error {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
@@ -72,8 +76,8 @@ func (p *PrintlnLogger) Log(ctx context.Context, event logs.EventV1) error {
 	}
 	result := gjson.Get(string(bs), "result.allowed")
 
-	// Print the decision logs only when result.allowed is false
-	if !result.Bool() {
+	// Print the decision logs only when result.allowed == false && Config.Stdout == true
+	if !result.Bool() && p.config.Stdout {
 		_, err = fmt.Fprintln(w, string(bs))
 	}
 
